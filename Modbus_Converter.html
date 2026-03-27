@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modbus CSV Exporter</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e17;
+    --panel: #0f1623;
+    --border: #1e3a5f;
+    --accent: #00d4ff;
+    --accent2: #00ff9d;
+    --warn: #ff6b35;
+    --text: #c8dff0;
+    --text-dim: #4a6fa5;
+    --glow: 0 0 20px rgba(0,212,255,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: 'Rajdhani', sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 700px;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .header .tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    opacity: 0.8;
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .header h1 {
+    font-size: clamp(28px, 6vw, 48px);
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #fff;
+    line-height: 1.1;
+  }
+
+  .header h1 span { color: var(--accent); text-shadow: var(--glow); }
+
+  .header p {
+    margin-top: 12px;
+    font-size: 16px;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 40px;
+    position: relative;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+  }
+
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 4px;
+    padding: 50px 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    background: rgba(0,212,255,0.02);
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(0,212,255,0.06);
+    box-shadow: var(--glow);
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    width: 56px; height: 56px;
+    margin: 0 auto 16px;
+    border: 2px solid var(--accent);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+  }
+
+  .upload-icon svg { width: 28px; height: 28px; }
+
+  .upload-zone h3 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .upload-zone p { font-size: 14px; color: var(--text-dim); font-family: 'Share Tech Mono', monospace; }
+
+  .upload-zone .ext-badge {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 4px 12px;
+    border: 1px solid var(--accent2);
+    color: var(--accent2);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    border-radius: 2px;
+  }
+
+  .status-area { margin-top: 24px; display: none; }
+  .status-area.visible { display: block; }
+
+  .status-bar {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 14px 18px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .status-bar.success { border-color: var(--accent2); color: var(--accent2); }
+  .status-bar.error { border-color: var(--warn); color: var(--warn); }
+  .status-bar.processing { border-color: var(--accent); color: var(--accent); }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: currentColor; }
+  .dot.pulse { animation: pulse 1s infinite; }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+  .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+
+  .stat-box {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    padding: 14px 18px;
+    border-radius: 2px;
+  }
+
+  .stat-box .label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .stat-box .value { font-size: 22px; font-weight: 700; color: var(--accent); }
+
+  .download-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    margin-top: 20px;
+    padding: 18px;
+    background: transparent;
+    border: 2px solid var(--accent2);
+    color: var(--accent2);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .download-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent2);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s ease;
+    z-index: 0;
+  }
+
+  .download-btn:hover::before { transform: scaleX(1); }
+  .download-btn:hover { color: #0a0e17; }
+  .download-btn span, .download-btn svg { position: relative; z-index: 1; }
+  .download-btn svg { width: 20px; height: 20px; }
+
+  .reset-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+  }
+
+  .reset-btn:hover { border-color: var(--text-dim); color: var(--text); }
+
+  .preview-section {
+    margin-top: 20px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    display: none;
+  }
+
+  .preview-section.visible { display: block; }
+
+  .preview-header {
+    background: rgba(0,212,255,0.08);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .preview-table-wrap { overflow-x: auto; max-height: 220px; overflow-y: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-family: 'Share Tech Mono', monospace; font-size: 12px; }
+
+  th {
+    background: rgba(0,0,0,0.4);
+    color: var(--accent);
+    padding: 8px 16px;
+    text-align: left;
+    letter-spacing: 2px;
+    font-size: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  td { padding: 7px 16px; color: var(--text); border-bottom: 1px solid rgba(30,58,95,0.5); }
+  tr:hover td { background: rgba(0,212,255,0.04); }
+
+  .footer {
+    margin-top: 24px;
+    text-align: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <span class="tag">// Industrial Automation Tool</span>
+    <h1>Modbus <span>CSV</span> Exporter</h1>
+    <p>Upload your .ccwmod file — get a clean CSV instantly</p>
+  </div>
+
+  <div class="card">
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="fileInput" accept=".ccwmod,.xml">
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <h3>Drop your file here</h3>
+      <p>or click to browse</p>
+      <span class="ext-badge">.CCWMOD</span>
+    </div>
+
+    <div class="status-area" id="statusArea">
+      <div class="status-bar" id="statusBar">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusText"></span>
+      </div>
+      <div class="stats-row" id="statsRow" style="display:none;">
+        <div class="stat-box">
+          <div class="label">Mappings Found</div>
+          <div class="value" id="countVal">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="label">File Name</div>
+          <div class="value" style="font-size:14px; padding-top:4px;" id="fileNameVal">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="preview-section" id="previewSection">
+      <div class="preview-header">
+        <span>PREVIEW — FIRST 10 ROWS</span>
+        <span id="previewCount"></span>
+      </div>
+      <div class="preview-table-wrap">
+        <table>
+          <thead>
+            <tr><th>VARIABLE</th><th>ADDRESS</th></tr>
+          </thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <button class="download-btn" id="downloadBtn" style="display:none;" onclick="downloadCSV()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      <span>Download CSV</span>
+    </button>
+
+    <button class="reset-btn" id="resetBtn" style="display:none;" onclick="resetTool()">
+      ↺ &nbsp; Convert Another File
+    </button>
+  </div>
+
+  <div class="footer">CCWMOD → CSV &nbsp;|&nbsp; 100% Client-Side &nbsp;|&nbsp; Your file never leaves your computer</div>
+</div>
+
+<script>
+  let csvData = '';
+  let outputFileName = 'Modbus_Export.csv';
+
+  const fileInput = document.getElementById('fileInput');
+  const uploadZone = document.getElementById('uploadZone');
+
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) processFile(fileInput.files[0]);
+  });
+
+  function setStatus(type, msg) {
+    document.getElementById('statusArea').classList.add('visible');
+    const bar = document.getElementById('statusBar');
+    bar.className = 'status-bar ' + type;
+    document.getElementById('statusText').textContent = msg;
+    const dot = document.getElementById('statusDot');
+    dot.className = 'dot' + (type === 'processing' ? ' pulse' : '');
+  }
+
+  function processFile(file) {
+    outputFileName = file.name.replace(/\.[^.]+$/, '') + '.csv';
+    const shortName = file.name.length > 18 ? file.name.substring(0, 16) + '...' : file.name;
+    document.getElementById('fileNameVal').textContent = shortName;
+    setStatus('processing', 'Reading file...');
+    document.getElementById('statsRow').style.display = 'none';
+    document.getElementById('downloadBtn').style.display = 'none';
+    document.getElementById('resetBtn').style.display = 'none';
+    document.getElementById('previewSection').classList.remove('visible');
+
+    const reader = new FileReader();
+    reader.onload = e => setTimeout(() => parseAndConvert(e.target.result), 100);
+    reader.onerror = () => setStatus('error', 'Failed to read file.');
+    reader.readAsText(file);
+  }
+
+  function parseAndConvert(content) {
+    try {
+      setStatus('processing', 'Parsing XML structure...');
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(content, 'application/xml');
+
+      if (xml.querySelector('parsererror')) {
+        setStatus('error', 'Invalid file — not a valid XML/CCWMOD file.');
+        return;
+      }
+
+      const nodes = xml.getElementsByTagName('mapping');
+      if (nodes.length === 0) {
+        setStatus('error', 'No "mapping" entries found. Please check this is the correct CCWMOD file.');
+        return;
+      }
+
+      const rows = [];
+      for (let i = 0; i < nodes.length; i++) {
+        const v = nodes[i].getAttribute('variable');
+        const a = nodes[i].getAttribute('address');
+        if (v && a) rows.push({ variable: v, address: a });
+      }
+
+      if (rows.length === 0) {
+        setStatus('error', 'Mappings found but none have both "variable" and "address" values.');
+        return;
+      }
+
+      const bom = '\uFEFF';
+      const lines = ['Variable,Address', ...rows.map(r => `${escapeCsv(r.variable)},${escapeCsv(r.address)}`)];
+      csvData = bom + lines.join('\r\n');
+
+      setStatus('success', '✓ Done — ' + rows.length + ' mappings extracted successfully');
+      document.getElementById('countVal').textContent = rows.length;
+      document.getElementById('statsRow').style.display = 'grid';
+      document.getElementById('downloadBtn').style.display = 'flex';
+      document.getElementById('resetBtn').style.display = 'block';
+      buildPreview(rows);
+
+    } catch (err) {
+      setStatus('error', 'Error: ' + err.message);
+    }
+  }
+
+  function escapeCsv(val) {
+    if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+      return '"' + val.replace(/"/g, '""') + '"';
+    }
+    return val;
+  }
+
+  function buildPreview(rows) {
+    const tbody = document.getElementById('previewBody');
+    tbody.innerHTML = '';
+    rows.slice(0, 10).forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escHtml(r.variable)}</td><td>${escHtml(r.address)}</td>`;
+      tbody.appendChild(tr);
+    });
+    document.getElementById('previewCount').textContent = Math.min(10, rows.length) + ' of ' + rows.length;
+    document.getElementById('previewSection').classList.add('visible');
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function downloadCSV() {
+    if (!csvData) return;
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = outputFileName;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  function resetTool() {
+    csvData = ''; fileInput.value = '';
+    document.getElementById('statusArea').classList.remove('visible');
+    document.getElementById('statsRow').style.display = 'none';
+    document.getElementById('downloadBtn').style.display = 'none';
+    document.getElementById('resetBtn').style.display = 'none';
+    document.getElementById('previewSection').classList.remove('visible');
+    document.getElementById('previewBody').innerHTML = '';
+  }
+</script>
+</body>
+</html>
