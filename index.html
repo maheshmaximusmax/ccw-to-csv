@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCW Modbus Converter — Mahesh Parmar</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #070d18;
+  --panel: #0c1525;
+  --border: #162d4e;
+  --border2: #1e3d66;
+  --accent: #00c8f0;
+  --accent2: #00f0a0;
+  --warn: #ff5a2c;
+  --text: #b8d4ee;
+  --text-dim: #3d5e85;
+  --text-mid: #7a9dbe;
+  --glow-blue: 0 0 24px rgba(0,200,240,0.25);
+  --glow-green: 0 0 24px rgba(0,240,160,0.25);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:var(--bg); font-family:'Rajdhani',sans-serif;
+  color:var(--text); min-height:100vh;
+  padding:30px 16px 60px; overflow-x:hidden;
+}
+body::before {
+  content:''; position:fixed; inset:0;
+  background-image:
+    linear-gradient(rgba(0,200,240,0.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,200,240,0.022) 1px,transparent 1px);
+  background-size:50px 50px; pointer-events:none; z-index:0;
+}
+.wrap { position:relative; z-index:1; max-width:860px; margin:0 auto; }
+
+/* HEADER */
+.site-header { text-align:center; margin-bottom:44px; }
+.site-header .eyebrow {
+  font-family:'Share Tech Mono',monospace; font-size:10px;
+  color:var(--accent); letter-spacing:5px; text-transform:uppercase;
+  opacity:.7; display:block; margin-bottom:12px;
+}
+.site-header h1 {
+  font-family:'Orbitron',monospace;
+  font-size:clamp(26px,6vw,52px); font-weight:900;
+  letter-spacing:3px; text-transform:uppercase; color:#fff; line-height:1;
+}
+.site-header h1 em { font-style:normal; color:var(--accent); text-shadow:var(--glow-blue); }
+.site-header h1 strong { color:var(--accent2); text-shadow:var(--glow-green); }
+.creator-name {
+  margin-top:16px;
+  font-family:'Orbitron',monospace;
+  font-size:clamp(14px,3vw,22px);
+  font-weight:700; letter-spacing:4px;
+  text-transform:uppercase;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.creator-label {
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; color:var(--text-dim);
+  letter-spacing:3px; margin-top:4px;
+}
+.site-header .sub {
+  margin-top:14px; font-size:15px;
+  color:var(--text-mid); letter-spacing:.5px;
+}
+
+/* TABS */
+.tab-bar {
+  display:grid; grid-template-columns:1fr 1fr;
+  border:1px solid var(--border2); border-radius:4px;
+  overflow:hidden; margin-bottom:24px;
+}
+.tab-btn {
+  padding:16px 10px; background:rgba(0,0,0,0.3);
+  border:none; cursor:pointer;
+  font-family:'Rajdhani',sans-serif; font-size:15px;
+  font-weight:700; letter-spacing:2px; text-transform:uppercase;
+  color:var(--text-dim); transition:all .25s;
+  display:flex; align-items:center; justify-content:center; gap:10px;
+}
+.tab-btn svg { width:17px;height:17px;opacity:.5;transition:opacity .25s; }
+.tab-btn:hover { color:var(--text); background:rgba(0,200,240,0.05); }
+.tab-btn.active-a { background:rgba(0,200,240,0.1);color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent); }
+.tab-btn.active-a svg { opacity:1; }
+.tab-btn.active-b { background:rgba(0,240,160,0.08);color:var(--accent2);box-shadow:inset 0 -2px 0 var(--accent2); }
+.tab-btn.active-b svg { opacity:1; }
+
+/* PANEL */
+.panel { display:none; }
+.panel.active { display:block; }
+
+/* CARD */
+.card {
+  background:var(--panel); border:1px solid var(--border2);
+  border-radius:4px; padding:32px; position:relative;
+  box-shadow:0 0 80px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.card.blue::before { content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent); }
+.card.green::before { content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent2),transparent); }
+.card::after { content:'';position:absolute;bottom:0;right:0;width:50px;height:50px;border-bottom:1px solid var(--border);border-right:1px solid var(--border); }
+
+/* SECTION LABEL */
+.sec-label {
+  font-family:'Share Tech Mono',monospace; font-size:10px;
+  letter-spacing:3px; text-transform:uppercase;
+  color:var(--text-dim); margin-bottom:14px;
+  display:flex; align-items:center; gap:10px;
+}
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+/* UPLOAD ZONE */
+.upload-zone {
+  border:2px dashed var(--border2); border-radius:4px;
+  padding:40px 20px; text-align:center; cursor:pointer;
+  transition:all .3s; position:relative; background:rgba(0,200,240,0.015);
+}
+.upload-zone.green-zone { background:rgba(0,240,160,0.012); }
+.upload-zone:hover,.upload-zone.drag-over { border-color:var(--accent);background:rgba(0,200,240,0.06);box-shadow:var(--glow-blue); }
+.green-zone:hover,.green-zone.drag-over { border-color:var(--accent2);background:rgba(0,240,160,0.06);box-shadow:var(--glow-green); }
+.upload-zone input[type=file] { position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%; }
+.up-icon { width:50px;height:50px;margin:0 auto 12px;border:2px solid var(--accent);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--accent); }
+.green-zone .up-icon { border-color:var(--accent2);color:var(--accent2); }
+.up-icon svg { width:24px;height:24px; }
+.upload-zone h3 { font-size:18px;font-weight:600;letter-spacing:1px;color:#fff;margin-bottom:5px; }
+.upload-zone p { font-size:12px;color:var(--text-dim);font-family:'Share Tech Mono',monospace; }
+.ext-badge { display:inline-block;margin-top:12px;padding:4px 14px;border:1px solid var(--accent2);color:var(--accent2);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;border-radius:2px; }
+.ext-badge.blue-badge { border-color:var(--accent);color:var(--accent); }
+
+/* TEMPLATE HINT */
+.template-hint {
+  margin-bottom:14px; background:rgba(0,0,0,0.3);
+  border:1px solid var(--border); border-radius:2px; padding:14px 16px;
+}
+.th-title { font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--accent2);letter-spacing:2px;margin-bottom:8px; }
+.template-hint pre { font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-mid);line-height:1.7;white-space:pre-wrap; }
+.info-box { margin-top:10px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);line-height:1.8; }
+.info-box span { color:var(--accent2); }
+.dl-template { margin-top:10px;background:none;border:1px solid var(--border2);color:var(--text-mid);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;padding:7px 14px;cursor:pointer;border-radius:2px;transition:all .2s; }
+.dl-template:hover { border-color:var(--accent2);color:var(--accent2); }
+
+/* STATUS */
+.status-area { margin-top:18px;display:none; }
+.status-area.visible { display:block; }
+.status-bar { background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:2px;padding:12px 15px;font-family:'Share Tech Mono',monospace;font-size:12px;display:flex;align-items:center;gap:10px; }
+.status-bar.success { border-color:var(--accent2);color:var(--accent2); }
+.status-bar.error { border-color:var(--warn);color:var(--warn); }
+.status-bar.processing { border-color:var(--accent);color:var(--accent); }
+.dot { width:7px;height:7px;border-radius:50%;flex-shrink:0;background:currentColor; }
+.dot.pulse { animation:pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.15} }
+
+/* STATS */
+.stats-row { display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px; }
+.stat-box { background:rgba(0,0,0,0.3);border:1px solid var(--border);padding:12px 14px;border-radius:2px; }
+.stat-box .slabel { font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px; }
+.stat-box .sval { font-size:20px;font-weight:700;color:var(--accent); }
+.stat-box .sval.green { color:var(--accent2); }
+.stat-box .sval.small { font-size:12px;padding-top:4px; }
+
+/* PREVIEW */
+.preview-section { margin-top:16px;border:1px solid var(--border);border-radius:2px;overflow:hidden;display:none; }
+.preview-section.visible { display:block; }
+.preview-header { background:rgba(0,200,240,0.07);border-bottom:1px solid var(--border);padding:8px 14px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:2px;display:flex;justify-content:space-between;align-items:center; }
+.preview-header.green-ph { background:rgba(0,240,160,0.06);color:var(--accent2); }
+.preview-table-wrap { overflow-x:auto;max-height:190px;overflow-y:auto; }
+table { width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;font-size:11px; }
+th { background:rgba(0,0,0,0.45);color:var(--accent);padding:7px 12px;text-align:left;letter-spacing:2px;font-size:9px;position:sticky;top:0;z-index:2; }
+th.green-th { color:var(--accent2); }
+td { padding:6px 12px;color:var(--text);border-bottom:1px solid rgba(22,45,78,0.6); }
+tr:hover td { background:rgba(0,200,240,0.03); }
+.td-reg { color:var(--accent2);font-weight:bold; }
+.td-type { color:var(--accent); }
+
+/* BUTTONS */
+.dl-btn { display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:16px;padding:16px;background:transparent;cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:700;letter-spacing:3px;text-transform:uppercase;border-radius:2px;transition:all .3s;position:relative;overflow:hidden; }
+.dl-btn.blue-btn { border:2px solid var(--accent);color:var(--accent); }
+.dl-btn.green-btn { border:2px solid var(--accent2);color:var(--accent2); }
+.dl-btn::before { content:'';position:absolute;inset:0;transform:scaleX(0);transform-origin:left;transition:transform .3s;z-index:0; }
+.dl-btn.blue-btn::before { background:var(--accent); }
+.dl-btn.green-btn::before { background:var(--accent2); }
+.dl-btn:hover::before { transform:scaleX(1); }
+.dl-btn:hover { color:#070d18; }
+.dl-btn span,.dl-btn svg { position:relative;z-index:1; }
+.dl-btn svg { width:18px;height:18px; }
+.reset-btn { display:block;width:100%;margin-top:10px;padding:10px;background:transparent;border:1px solid var(--border);color:var(--text-dim);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:2px;text-transform:uppercase;cursor:pointer;border-radius:2px;transition:all .2s; }
+.reset-btn:hover { border-color:var(--text-mid);color:var(--text); }
+
+/* FOOTER */
+.site-footer { margin-top:28px;text-align:center;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:1px;line-height:2; }
+
+@media(max-width:540px){
+  .card{padding:20px 14px;}
+  .stats-row{grid-template-columns:1fr 1fr;}
+  .tab-btn{font-size:12px;letter-spacing:1px;padding:14px 6px;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <span class="eyebrow">// Allen Bradley CCW Modbus Mapping Tool</span>
+    <h1><em>CCW</em> ↔ <strong>CSV</strong></h1>
+    <div class="creator-name">Mahesh Parmar</div>
+    <div class="creator-label">// Created By</div>
+    <p class="sub">Convert Modbus mappings in both directions — 100% accurate, works in your browser</p>
+  </header>
+
+  <!-- TABS -->
+  <div class="tab-bar">
+    <button class="tab-btn active-a" id="tabA" onclick="switchTab('A')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 7h8M8 12h8M8 17h5"/></svg>
+      .CCWMOD → CSV
+    </button>
+    <button class="tab-btn" id="tabB" onclick="switchTab('B')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      CSV → .CCWMOD
+    </button>
+  </div>
+
+  <!-- ═══ PANEL A : CCWMOD → CSV ═══ -->
+  <div class="panel active" id="panelA">
+    <div class="card blue">
+      <div class="sec-label">Upload Source File</div>
+      <div class="upload-zone" id="uploadZoneA">
+        <input type="file" id="fileInputA" accept=".ccwmod,.xml">
+        <div class="up-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <h3>Drop .ccwmod file here</h3>
+        <p>or click to browse</p>
+        <span class="ext-badge blue-badge">.CCWMOD</span>
+      </div>
+
+      <div class="status-area" id="statusAreaA">
+        <div class="status-bar" id="statusBarA"><div class="dot" id="statusDotA"></div><span id="statusTextA"></span></div>
+        <div class="stats-row" id="statsRowA" style="display:none">
+          <div class="stat-box"><div class="slabel">Total Mappings</div><div class="sval" id="countA">0</div></div>
+          <div class="stat-box"><div class="slabel">COILS</div><div class="sval" id="coilsA">0</div></div>
+          <div class="stat-box"><div class="slabel">HOLDING REG</div><div class="sval" id="holdA">0</div></div>
+        </div>
+      </div>
+
+      <div class="preview-section" id="previewA">
+        <div class="preview-header"><span>PREVIEW — FIRST 10 ROWS</span><span id="previewCountA"></span></div>
+        <div class="preview-table-wrap">
+          <table><thead><tr><th>VARIABLE</th><th>PARENT</th><th>DATA TYPE</th><th>ADDRESS</th><th>REGISTER</th></tr></thead>
+          <tbody id="previewBodyA"></tbody></table>
+        </div>
+      </div>
+
+      <button class="dl-btn blue-btn" id="dlBtnA" style="display:none" onclick="downloadA()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Download Full CSV</span>
+      </button>
+      <button class="reset-btn" id="resetBtnA" style="display:none" onclick="resetA()">↺ &nbsp; Convert Another File</button>
+    </div>
+  </div>
+
+  <!-- ═══ PANEL B : CSV → CCWMOD ═══ -->
+  <div class="panel" id="panelB">
+    <div class="card green">
+      <div class="sec-label">CSV Format Required</div>
+
+      <div class="template-hint">
+        <div class="th-title">// Required CSV Columns (export from this tool for best results)</div>
+        <pre>variable,parent,dataType,address,registerType,va,elemType,subElemType,dataTypeSize,isArray,arrayUpper,arrayLower
+ATH_P1_START_STOP,Micro850,Bool,00017,COILS,0x4f7,Bool,Any,1,0,,
+ATH_E1_IN_V_POSITION,Micro850,Real,40001,HOLDING_REGISTERS,0x60c,Real,Any,4,0,,
+R_PHASE,Micro850,AnyArray,40057,HOLDING_REGISTERS,0x1420,AnyArray,Real,4,1,1,1</pre>
+        <div class="info-box">
+          <span>registerType</span> = COILS or HOLDING_REGISTERS &nbsp;|&nbsp;
+          <span>isArray</span> = 1 for AnyArray, 0 otherwise &nbsp;|&nbsp;
+          <span>va</span> = hex value (keep from original or use 0x0)
+        </div>
+        <button class="dl-template" onclick="downloadTemplate()">⬇ Download Full Template CSV</button>
+      </div>
+
+      <div class="upload-zone green-zone" id="uploadZoneB">
+        <input type="file" id="fileInputB" accept=".csv">
+        <div class="up-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <h3>Drop .csv file here</h3>
+        <p>or click to browse</p>
+        <span class="ext-badge">.CSV</span>
+      </div>
+
+      <div class="status-area" id="statusAreaB">
+        <div class="status-bar" id="statusBarB"><div class="dot" id="statusDotB"></div><span id="statusTextB"></span></div>
+        <div class="stats-row" id="statsRowB" style="display:none">
+          <div class="stat-box"><div class="slabel">Total Mappings</div><div class="sval green" id="countB">0</div></div>
+          <div class="stat-box"><div class="slabel">COILS</div><div class="sval green" id="coilsB">0</div></div>
+          <div class="stat-box"><div class="slabel">HOLDING REG</div><div class="sval green" id="holdB">0</div></div>
+        </div>
+      </div>
+
+      <div class="preview-section" id="previewB">
+        <div class="preview-header green-ph"><span>PREVIEW — FIRST 10 ROWS</span><span id="previewCountB"></span></div>
+        <div class="preview-table-wrap">
+          <table><thead><tr><th class="green-th">VARIABLE</th><th class="green-th">PARENT</th><th class="green-th">DATA TYPE</th><th class="green-th">ADDRESS</th><th class="green-th">REGISTER</th></tr></thead>
+          <tbody id="previewBodyB"></tbody></table>
+        </div>
+      </div>
+
+      <button class="dl-btn green-btn" id="dlBtnB" style="display:none" onclick="downloadB()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Download .ccwmod File</span>
+      </button>
+      <button class="reset-btn" id="resetBtnB" style="display:none" onclick="resetB()">↺ &nbsp; Convert Another File</button>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    CCW Modbus Converter Pro &nbsp;|&nbsp; Created by Mahesh Parmar &nbsp;|&nbsp; 100% Client-Side — Files Never Leave Your Computer<br>
+    Allen Bradley Micro850 · CCW v13+ Compatible · Free Forever
+  </footer>
+</div>
+
+<script>
+/* ── TAB SWITCH ── */
+function switchTab(t){
+  document.getElementById('panelA').classList.toggle('active',t==='A');
+  document.getElementById('panelB').classList.toggle('active',t==='B');
+  document.getElementById('tabA').className='tab-btn'+(t==='A'?' active-a':'');
+  document.getElementById('tabB').className='tab-btn'+(t==='B'?' active-b':'');
+}
+
+/* ── HELPERS ── */
+function setStatus(id,type,msg){
+  document.getElementById('statusArea'+id).classList.add('visible');
+  document.getElementById('statusBar'+id).className='status-bar '+type;
+  document.getElementById('statusText'+id).textContent=msg;
+  document.getElementById('statusDot'+id).className='dot'+(type==='processing'?' pulse':'');
+}
+function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeCsv(v){ v=String(v); return (v.includes(',')||v.includes('"')||v.includes('\n'))?'"'+v.replace(/"/g,'""')+'"':v; }
+function triggerDownload(content,filename,mime){
+  const blob=new Blob([content],{type:mime});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+function parseCsvLine(line){
+  const res=[]; let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){ if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ; }
+    else if(c===','&&!inQ){res.push(cur);cur='';}
+    else cur+=c;
+  }
+  res.push(cur); return res;
+}
+
+/* ══════════════════════════════════════════
+   PANEL A — CCWMOD → CSV
+══════════════════════════════════════════ */
+let csvDataA='', fileOutA='Modbus_Export.csv';
+
+(function(){
+  const zone=document.getElementById('uploadZoneA');
+  const inp=document.getElementById('fileInputA');
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
+  zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag-over');if(e.dataTransfer.files[0])startA(e.dataTransfer.files[0]);});
+  inp.addEventListener('change',()=>{if(inp.files[0])startA(inp.files[0]);});
+})();
+
+function startA(file){
+  fileOutA=file.name.replace(/\.[^.]+$/,'')+'.csv';
+  setStatus('A','processing','Reading file…');
+  ['statsRowA','dlBtnA','resetBtnA'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('previewA').classList.remove('visible');
+  csvDataA='';
+  const r=new FileReader();
+  r.onload=e=>setTimeout(()=>parseA(e.target.result,file.name),80);
+  r.onerror=()=>setStatus('A','error','Could not read file.');
+  r.readAsText(file);
+}
+
+function parseA(content,fname){
+  try{
+    setStatus('A','processing','Parsing XML…');
+    const xml=new DOMParser().parseFromString(content,'application/xml');
+    if(xml.querySelector('parsererror')){setStatus('A','error','Invalid file — not a valid CCWMOD/XML.');return;}
+
+    // Collect all modbusRegister sections
+    const regSections=xml.getElementsByTagName('modbusRegister');
+    if(!regSections.length){setStatus('A','error','No <modbusRegister> sections found. Check your file.');return;}
+
+    const rows=[];
+    for(let s=0;s<regSections.length;s++){
+      const regName=regSections[s].getAttribute('name')||'UNKNOWN';
+      const mappings=regSections[s].getElementsByTagName('mapping');
+      for(let i=0;i<mappings.length;i++){
+        const m=mappings[i];
+        const variable=m.getAttribute('variable')||'';
+        const parent=m.getAttribute('parent')||'Micro850';
+        const dataType=m.getAttribute('dataType')||'Bool';
+        const address=m.getAttribute('address')||'';
+        const va=m.getAttribute('va')||'0x0';
+        // Read MBVarInfo
+        const mbvi=m.getElementsByTagName('MBVarInfo')[0];
+        const elemType=mbvi?mbvi.getAttribute('ElemType'):'Bool';
+        const subElemType=mbvi?mbvi.getAttribute('SubElemType'):'Any';
+        const dataTypeSize=mbvi?mbvi.getAttribute('DataTypeSize'):'1';
+        // Check for array
+        const arrInfo=m.getElementsByTagName('MBArrayInfo')[0];
+        const isArray=arrInfo?'1':'0';
+        let arrayUpper='',arrayLower='';
+        if(arrInfo){
+          const dimInfo=arrInfo.getElementsByTagName('MBArrayDimensionInfo')[0];
+          if(dimInfo){arrayUpper=dimInfo.getAttribute('Upper')||'1';arrayLower=dimInfo.getAttribute('Lower')||'1';}
+        }
+        if(variable&&address){
+          rows.push({variable,parent,dataType,address,registerType:regName,va,elemType,subElemType,dataTypeSize,isArray,arrayUpper,arrayLower});
+        }
+      }
+    }
+    if(!rows.length){setStatus('A','error','No valid mappings found.');return;}
+
+    // Build CSV with ALL columns
+    const header='variable,parent,dataType,address,registerType,va,elemType,subElemType,dataTypeSize,isArray,arrayUpper,arrayLower';
+    const lines=[header,...rows.map(r=>
+      [r.variable,r.parent,r.dataType,r.address,r.registerType,r.va,r.elemType,r.subElemType,r.dataTypeSize,r.isArray,r.arrayUpper,r.arrayLower].map(escapeCsv).join(',')
+    )];
+    csvDataA='\uFEFF'+lines.join('\r\n');
+
+    const coils=rows.filter(r=>r.registerType==='COILS').length;
+    const hold=rows.filter(r=>r.registerType==='HOLDING_REGISTERS').length;
+    setStatus('A','success','✓ Done — '+rows.length+' mappings extracted');
+    document.getElementById('countA').textContent=rows.length;
+    document.getElementById('coilsA').textContent=coils;
+    document.getElementById('holdA').textContent=hold;
+    document.getElementById('statsRowA').style.display='grid';
+    document.getElementById('dlBtnA').style.display='flex';
+    document.getElementById('resetBtnA').style.display='block';
+    buildPreviewFull('A',rows);
+  }catch(e){setStatus('A','error','Error: '+e.message);}
+}
+
+function downloadA(){ if(csvDataA) triggerDownload(csvDataA,fileOutA,'text/csv;charset=utf-8;'); }
+
+function resetA(){
+  csvDataA=''; document.getElementById('fileInputA').value='';
+  document.getElementById('statusAreaA').classList.remove('visible');
+  document.getElementById('statsRowA').style.display='none';
+  document.getElementById('dlBtnA').style.display='none';
+  document.getElementById('resetBtnA').style.display='none';
+  document.getElementById('previewA').classList.remove('visible');
+  document.getElementById('previewBodyA').innerHTML='';
+}
+
+/* ══════════════════════════════════════════
+   PANEL B — CSV → CCWMOD (EXACT FORMAT)
+══════════════════════════════════════════ */
+let ccwDataB='', fileOutB='Modbus_Import.ccwmod';
+
+(function(){
+  const zone=document.getElementById('uploadZoneB');
+  const inp=document.getElementById('fileInputB');
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
+  zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag-over');if(e.dataTransfer.files[0])startB(e.dataTransfer.files[0]);});
+  inp.addEventListener('change',()=>{if(inp.files[0])startB(inp.files[0]);});
+})();
+
+function startB(file){
+  fileOutB=file.name.replace(/\.[^.]+$/,'')+'.ccwmod';
+  setStatus('B','processing','Reading CSV…');
+  ['statsRowB','dlBtnB','resetBtnB'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('previewB').classList.remove('visible');
+  ccwDataB='';
+  const r=new FileReader();
+  r.onload=e=>setTimeout(()=>parseB(e.target.result),80);
+  r.onerror=()=>setStatus('B','error','Could not read file.');
+  r.readAsText(file);
+}
+
+function parseB(content){
+  try{
+    setStatus('B','processing','Parsing CSV data…');
+    const text=content.replace(/^\uFEFF/,'');
+    const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
+    if(!lines.length){setStatus('B','error','CSV file is empty.');return;}
+
+    // Parse header
+    const headerCols=parseCsvLine(lines[0]).map(h=>h.trim().toLowerCase());
+    const col=name=>{const i=headerCols.indexOf(name);return i;};
+
+    const iVar=col('variable'), iParent=col('parent'), iDataType=col('datatype'),
+          iAddr=col('address'), iReg=col('registertype'), iVa=col('va'),
+          iElem=col('elemtype'), iSub=col('subElemtype')||col('subelemtype'),
+          iSize=col('datatypesize'), iIsArr=col('isarray'),
+          iArrUp=col('arrayupper'), iArrLow=col('arraylower');
+
+    // Detect if this is a simple 2-column CSV (Variable,Address only)
+    const isSimple=(iVar>=0&&iAddr>=0&&iReg<0);
+    const isFullFormat=(iVar>=0&&iAddr>=0&&iReg>=0);
+
+    if(iVar<0||iAddr<0){setStatus('B','error','CSV must have at least "variable" and "address" columns.');return;}
+
+    const rows=[];
+    for(let i=1;i<lines.length;i++){
+      const parts=parseCsvLine(lines[i]);
+      const variable=(parts[iVar]||'').trim();
+      const address=(parts[iAddr]||'').trim();
+      if(!variable||!address) continue;
+
+      let registerType='COILS', parent='Micro850', dataType='Bool';
+      let va='0x0', elemType='Bool', subElemType='Any', dataTypeSize='1';
+      let isArray='0', arrayUpper='', arrayLower='';
+
+      if(isFullFormat){
+        registerType=(parts[iReg]||'COILS').trim();
+        parent=iParent>=0?(parts[iParent]||'Micro850').trim():'Micro850';
+        dataType=iDataType>=0?(parts[iDataType]||'Bool').trim():'Bool';
+        va=iVa>=0?(parts[iVa]||'0x0').trim():'0x0';
+        elemType=iElem>=0?(parts[iElem]||dataType).trim():dataType;
+        subElemType=iSub>=0?(parts[iSub]||'Any').trim():'Any';
+        dataTypeSize=iSize>=0?(parts[iSize]||'1').trim():'1';
+        isArray=iIsArr>=0?(parts[iIsArr]||'0').trim():'0';
+        arrayUpper=iArrUp>=0?(parts[iArrUp]||'').trim():'';
+        arrayLower=iArrLow>=0?(parts[iArrLow]||'').trim():'';
+      } else {
+        // Auto-detect from address number
+        const addrNum=parseInt(address,10);
+        if(addrNum>=40000){ registerType='HOLDING_REGISTERS'; dataType='Real'; elemType='Real'; dataTypeSize='4'; }
+        else { registerType='COILS'; dataType='Bool'; elemType='Bool'; dataTypeSize='1'; }
+      }
+      rows.push({variable,parent,dataType,address,registerType,va,elemType,subElemType,dataTypeSize,isArray,arrayUpper,arrayLower});
+    }
+
+    if(!rows.length){setStatus('B','error','No valid rows found. Check CSV format.');return;}
+
+    ccwDataB=buildCCWMOD(rows);
+    const coils=rows.filter(r=>r.registerType==='COILS').length;
+    const hold=rows.filter(r=>r.registerType==='HOLDING_REGISTERS').length;
+    setStatus('B','success','✓ Done — '+rows.length+' mappings written');
+    document.getElementById('countB').textContent=rows.length;
+    document.getElementById('coilsB').textContent=coils;
+    document.getElementById('holdB').textContent=hold;
+    document.getElementById('statsRowB').style.display='grid';
+    document.getElementById('dlBtnB').style.display='flex';
+    document.getElementById('resetBtnB').style.display='block';
+    buildPreviewFull('B',rows);
+  }catch(e){setStatus('B','error','Error: '+e.message);}
+}
+
+/* ── BUILD EXACT CCWMOD XML ── */
+function buildCCWMOD(rows){
+  // Group by registerType
+  const groups={};
+  rows.forEach(r=>{
+    if(!groups[r.registerType]) groups[r.registerType]=[];
+    groups[r.registerType].push(r);
+  });
+
+  let xml='<modbusServer Version="2.0">\n';
+
+  for(const regType of Object.keys(groups)){
+    xml+=`  <modbusRegister name="${escAttr(regType)}">\n`;
+    for(const r of groups[regType]){
+      xml+=`    <mapping variable="${escAttr(r.variable)}" parent="${escAttr(r.parent)}" dataType="${escAttr(r.dataType)}" address="${escAttr(r.address)}" va="${escAttr(r.va)}">\n`;
+      if(r.isArray==='1'||r.dataType==='AnyArray'){
+        xml+=`      <MBVarInfo ElemType="${escAttr(r.elemType)}" SubElemType="${escAttr(r.subElemType)}" DataTypeSize="${escAttr(r.dataTypeSize)}">\n`;
+        xml+=`        <MBArrayInfo ArrayDimension="1">\n`;
+        const up=r.arrayUpper||'1', lo=r.arrayLower||'1';
+        xml+=`          <MBArrayDimensionInfo Index="0" Upper="${escAttr(up)}" Lower="${escAttr(lo)}" />\n`;
+        xml+=`        </MBArrayInfo>\n`;
+        xml+=`      </MBVarInfo>\n`;
+      } else {
+        xml+=`      <MBVarInfo ElemType="${escAttr(r.elemType)}" SubElemType="${escAttr(r.subElemType)}" DataTypeSize="${escAttr(r.dataTypeSize)}" />\n`;
+      }
+      xml+=`    </mapping>\n`;
+    }
+    xml+=`  </modbusRegister>\n`;
+  }
+  xml+=`</modbusServer>`;
+  return xml;
+}
+
+function downloadB(){ if(ccwDataB) triggerDownload(ccwDataB,fileOutB,'application/xml'); }
+
+function resetB(){
+  ccwDataB=''; document.getElementById('fileInputB').value='';
+  document.getElementById('statusAreaB').classList.remove('visible');
+  document.getElementById('statsRowB').style.display='none';
+  document.getElementById('dlBtnB').style.display='none';
+  document.getElementById('resetBtnB').style.display='none';
+  document.getElementById('previewB').classList.remove('visible');
+  document.getElementById('previewBodyB').innerHTML='';
+}
+
+/* ── PREVIEW ── */
+function buildPreviewFull(id,rows){
+  const tbody=document.getElementById('previewBody'+id);
+  tbody.innerHTML='';
+  rows.slice(0,10).forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${escHtml(r.variable)}</td><td>${escHtml(r.parent)}</td><td class="td-type">${escHtml(r.dataType)}</td><td>${escHtml(r.address)}</td><td class="td-reg">${escHtml(r.registerType)}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('previewCount'+id).textContent=Math.min(10,rows.length)+' of '+rows.length;
+  document.getElementById('preview'+id).classList.add('visible');
+}
+
+/* ── TEMPLATE DOWNLOAD ── */
+function downloadTemplate(){
+  const h='variable,parent,dataType,address,registerType,va,elemType,subElemType,dataTypeSize,isArray,arrayUpper,arrayLower\r\n';
+  const rows=[
+    'ATH_P1_START_STOP,Micro850,Bool,00017,COILS,0x4f7,Bool,Any,1,0,,',
+    'ATH_P2_START_STOP,Micro850,Bool,00019,COILS,0x4f9,Bool,Any,1,0,,',
+    'ATH_E1_IN_V_POSITION,Micro850,Real,40001,HOLDING_REGISTERS,0x60c,Real,Any,4,0,,',
+    'ATH_E2_IN_V_POSITION,Micro850,Real,40003,HOLDING_REGISTERS,0x610,Real,Any,4,0,,',
+    'R_PHASE,Micro850,AnyArray,40057,HOLDING_REGISTERS,0x1420,AnyArray,Real,4,1,1,1',
+    'Y_PHASE,Micro850,AnyArray,40059,HOLDING_REGISTERS,0x1424,AnyArray,Real,4,1,1,1',
+  ].join('\r\n');
+  triggerDownload('\uFEFF'+h+rows,'Modbus_Template.csv','text/csv;charset=utf-8;');
+}
+</script>
+</body>
+</html>
